@@ -9,7 +9,7 @@
     "level": 1,
     "system_version": ">=3.2.3,<4",
     "history": {
-      "v1.0.0": "首发版本：通过绿联 UGOS Pro OpenCLI 只读接口获取 NAS 运行概览，展示 CPU、GPU、内存、CPU 温度、风扇、磁盘健康与温度、网卡流量及存储卷读写；支持 Token 配置、HTTPS 证书校验选项和本地缓存。"
+      "v1.0.0": "通过绿联 UGOS Pro OpenCLI 只读接口获取 NAS 运行概览，展示 CPU、GPU、内存、CPU 温度、风扇、磁盘健康与温度、网卡流量及存储卷读写；支持 Token 配置、HTTPS 证书校验选项和本地缓存。"
     },
     "plugin_readme": "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/plugins.v3/ugreennasmonitor/README.md",
     "release": true
