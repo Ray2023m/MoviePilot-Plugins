@@ -83,7 +83,7 @@ class UGreenNASMonitor(_PluginBase):
     plugin_name = "绿联 NAS 监控"
     plugin_desc = "读取绿联 UGOS Pro 任务管理状态，展示 CPU、内存、温度、网络和磁盘健康。"
     plugin_icon = "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg"
-    plugin_version = "1.2.0"
+    plugin_version = "1.3.0"
     plugin_author = "Ray2023m"
     author_url = "https://github.com/Ray2023m"
     plugin_config_prefix = "ugreennasmonitor_"
@@ -477,44 +477,3 @@ class UGreenNASMonitor(_PluginBase):
                 "type": "info", "variant": "tonal",
             })]
         return self._build_content()
-
-    def get_dashboard_meta(self) -> list[dict[str, str]]:
-        """Register one optional dashboard tile without changing user dashboard settings."""
-        return [{"key": "overview", "name": "绿联 NAS 状态"}] if self.get_state() else []
-
-    def get_dashboard(self, key: str, **kwargs):
-        """Return a compact status tile using the host's dashboard renderer."""
-        if key != "overview" or not self.get_state():
-            return None
-        payload, error, cached = self._view()
-        if payload is None:
-            return (
-                {"cols": 12, "md": 6},
-                {"title": "绿联 NAS", "refresh": 60, "border": True},
-                [_node("VAlert", error or "暂无 NAS 数据", {"type": "warning", "variant": "tonal"})],
-            )
-        data = payload["data"]
-        disks = data.get("disks") if isinstance(data.get("disks"), list) else []
-        bad_disks = [d for d in disks if isinstance(d, dict) and str(d.get("status", "")).upper() != "GOOD"]
-        cpu = _fmt(data.get("cpu_used_percent")) + "%"
-        mem = _fmt(data.get("mem_used_percent")) + "%"
-        temp = f"{_fmt(data.get('cpu_temperature'), 0)} °C" if data.get("cpu_temperature") is not None else "—"
-        disk_label = f"{len(disks) - len(bad_disks)}/{len(disks)} 磁盘正常" if disks else "未获取磁盘信息"
-        status_color = "success" if not bad_disks and disks else "warning"
-        content = []
-        if error:
-            content.append(_node("VAlert", error, {"type": "warning", "variant": "tonal", "density": "compact"}))
-        content.append(_node("VRow", content=[
-            _metric("CPU", cpu, "mdi-cpu-64-bit"),
-            _metric("内存", mem, "mdi-memory"),
-            _metric("CPU 温度", temp, "mdi-thermometer"),
-            _metric("磁盘健康", disk_label, "mdi-harddisk", status_color),
-        ]))
-        if bad_disks:
-            content.append(_node("VAlert", "异常磁盘：" + "、".join(str(d.get("name") or "未命名") for d in bad_disks),
-                                 {"type": "error", "variant": "tonal", "class": "mt-2"}))
-        return (
-            {"cols": 12, "md": 6},
-            {"title": "绿联 NAS 状态" + (" · 缓存" if cached else ""), "refresh": 60, "border": True},
-            content,
-        )
