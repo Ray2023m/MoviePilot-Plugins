@@ -1,21 +1,15 @@
 {
   "UGreenNASMonitor": {
     "name": "绿联 NAS 监控",
-    "description": "在 MoviePilot 插件详情页查看绿联 UGOS Pro 的 CPU、内存、温度、硬盘、网络及存储卷状态。",
+    "description": "在 MoviePilot V3 插件详情页查看绿联 UGOS Pro 的 CPU、内存、温度、风扇、硬盘、网络及存储卷状态。",
     "labels": "NAS,监控,绿联",
-    "version": "1.5.1",
+    "version": "1.0.0",
     "icon": "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg",
     "author": "Ray2023m",
     "level": 1,
     "system_version": ">=3.2.3,<4",
     "history": {
-      "v1.0.0": "首版：支持绿联 UGOS Pro JSON 转换接口，展示 CPU、内存、温度、风扇、磁盘、网络和卷读写状态；提供插件详情页及可选仪表板组件。",
-      "v1.1.0": "改为插件直接调用绿联 NAS OpenCLI GetRunOverview，移除 JSON Bridge 和独立 API_KEY；插件内置只读 Protobuf 解码。",
-      "v1.2.0": "优化详情页视觉：状态概览、指标进度条、磁盘健康标签、网卡流量卡片及存储卷吞吐卡片；保持 OpenCLI 请求和 Protobuf 解码逻辑不变。",
-      "v1.3.0": "取消首页仪表板展示，仅保留插件详情页监控。",
-      "v1.4.0": "详情页改为紧凑双栏布局：桌面端左侧磁盘、右侧网络与卷吞吐；压缩卡片、表格行高和区块间距，减少页面纵向高度。",
-      "v1.5.0": "CPU 温度移至顶部风扇转速旁；内存占用详情放入原 CPU 温度指标卡位置；网络流量与存储卷吞吐恢复全宽布局。",
-      "v1.5.1": "细节优化：CPU 温度调整到风扇转速前；统一指标卡标题与数值的行高、字号及数字对齐，改善内存占用详情卡的显示一致性。"
+      "v1.0.0": "首发版本：通过绿联 UGOS Pro OpenCLI 只读接口获取 NAS 运行概览，展示 CPU、GPU、内存、CPU 温度、风扇、磁盘健康与温度、网卡流量及存储卷读写；支持 Token 配置、HTTPS 证书校验选项和本地缓存。"
     },
     "plugin_readme": "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/plugins.v3/ugreennasmonitor/README.md",
     "release": true
