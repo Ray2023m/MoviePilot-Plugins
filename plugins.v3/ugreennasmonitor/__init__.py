@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import ssl
+import struct
 import threading
 import time
 from typing import Any
@@ -73,7 +75,7 @@ class UGreenNASMonitor(_PluginBase):
     plugin_name = "绿联 NAS 监控"
     plugin_desc = "读取绿联 UGOS Pro 任务管理状态，展示 CPU、内存、温度、网络和磁盘健康。"
     plugin_icon = "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg"
-    plugin_version = "1.0.0"
+    plugin_version = "1.1.0"
     plugin_author = "Ray2023m"
     author_url = "https://github.com/Ray2023m"
     plugin_config_prefix = "ugreennasmonitor_"
@@ -83,8 +85,9 @@ class UGreenNASMonitor(_PluginBase):
     def __init__(self):
         super().__init__()
         self._enabled = False
-        self._url = "http://10.10.10.233:8765/api/ugreen"
-        self._api_key = ""
+        self._nas_url = "https://10.10.10.10:9443"
+        self._token = ""
+        self._verify_ssl = False
         self._refresh_seconds = 15
         self._cache: dict | None = None
         self._cache_at = 0.0
@@ -96,8 +99,9 @@ class UGreenNASMonitor(_PluginBase):
         config = config or {}
         with self._lock:
             self._enabled = config.get("enabled", False) is True
-            self._url = str(config.get("url") or "http://10.10.10.233:8765/api/ugreen").strip()
-            self._api_key = str(config.get("api_key") or "").strip()
+            self._nas_url = str(config.get("nas_url") or "https://10.10.10.10:9443").strip().rstrip("/")
+            self._token = str(config.get("token") or "").strip()
+            self._verify_ssl = config.get("verify_ssl", False) is True
             try:
                 self._refresh_seconds = min(300, max(5, int(config.get("refresh_seconds", 15))))
             except (TypeError, ValueError):
@@ -114,7 +118,7 @@ class UGreenNASMonitor(_PluginBase):
         """Clear runtime credentials and cached data when the plugin is stopped."""
         with self._lock:
             self._enabled = False
-            self._api_key = ""
+            self._token = ""
             self._cache = None
             self._cache_at = 0.0
 
@@ -128,84 +132,190 @@ class UGreenNASMonitor(_PluginBase):
         return []
 
     def get_form(self) -> tuple[list[dict], dict]:
-        """Return plugin settings; the bridge key is stored only in MoviePilot config."""
+        """Configure the NAS endpoint and its scoped OpenCLI access token."""
         return [
             {
                 "component": "VForm",
                 "content": [
-                    {"component": "VSwitch", "props": {
-                        "model": "enabled", "label": "启用绿联 NAS 监控",
-                    }},
+                    {"component": "VSwitch", "props": {"model": "enabled", "label": "启用绿联 NAS 监控"}},
                     {"component": "VTextField", "props": {
-                        "model": "url", "label": "JSON 转换服务地址",
-                        "hint": "例如 http://10.10.10.233:8765/api/ugreen",
+                        "model": "nas_url", "label": "绿联 NAS 地址",
+                        "hint": "例如 https://10.10.10.10:9443；填写 NAS 根地址，不要附加 API 路径。",
                         "persistentHint": True, "clearable": False,
                     }},
                     {"component": "VTextField", "props": {
-                        "model": "api_key", "label": "转换服务访问密钥",
+                        "model": "token", "label": "绿联 NAS API Token",
                         "type": "password", "autocomplete": "new-password",
+                        "hint": "填写 ugpoa_v1. 开头的访问令牌；只需任务管理读取权限。",
+                        "persistentHint": True,
+                    }},
+                    {"component": "VSwitch", "props": {
+                        "model": "verify_ssl", "label": "验证 HTTPS 证书",
+                        "hint": "NAS 使用自签证书时关闭；使用可信证书时建议开启。",
+                        "persistentHint": True,
                     }},
                     {"component": "VTextField", "props": {
                         "model": "refresh_seconds", "label": "数据缓存时间（秒）",
                         "type": "number", "min": 5, "max": 300,
-                        "hint": "建议 10–30 秒；不会改变 NAS 本身的采样频率。",
+                        "hint": "建议 10–30 秒。",
                         "persistentHint": True,
                     }},
                 ],
             }
         ], {
             "enabled": False,
-            "url": "http://10.10.10.233:8765/api/ugreen",
-            "api_key": "",
+            "nas_url": "https://10.10.10.10:9443",
+            "token": "",
+            "verify_ssl": False,
             "refresh_seconds": 15,
         }
 
+    @staticmethod
+    def _read_varint(buf: bytes, pos: int) -> tuple[int, int]:
+        value = 0
+        shift = 0
+        while pos < len(buf) and shift < 70:
+            byte = buf[pos]
+            pos += 1
+            value |= (byte & 0x7f) << shift
+            if byte < 0x80:
+                return value, pos
+            shift += 7
+        raise ValueError("protobuf varint 不完整")
+
+    @classmethod
+    def _decode_message(cls, buf: bytes, schema: dict) -> dict:
+        """Decode only the known RunOverview protobuf fields; safely skip unknown fields."""
+        by_number = {item["number"]: item for item in schema}
+        result: dict[str, Any] = {}
+        pos = 0
+        while pos < len(buf):
+            tag, pos = cls._read_varint(buf, pos)
+            number, wire = tag >> 3, tag & 7
+            if number == 0:
+                raise ValueError("protobuf 字段编号无效")
+            field = by_number.get(number)
+            if wire == 0:
+                raw, pos = cls._read_varint(buf, pos)
+            elif wire == 1:
+                if pos + 8 > len(buf): raise ValueError("protobuf fixed64 越界")
+                raw, pos = buf[pos:pos + 8], pos + 8
+            elif wire == 2:
+                length, pos = cls._read_varint(buf, pos)
+                if length > 1024 * 1024 or pos + length > len(buf): raise ValueError("protobuf 长度越界")
+                raw, pos = buf[pos:pos + length], pos + length
+            elif wire == 5:
+                if pos + 4 > len(buf): raise ValueError("protobuf fixed32 越界")
+                raw, pos = buf[pos:pos + 4], pos + 4
+            else:
+                raise ValueError("protobuf wire type 不支持")
+            if not field:
+                continue
+            kind = field["type"]
+            if kind == "DOUBLE":
+                if wire != 1: raise ValueError("protobuf DOUBLE wire type 错误")
+                value = struct.unpack("<d", raw)[0]
+            elif kind == "STRING":
+                if wire != 2: raise ValueError("protobuf STRING wire type 错误")
+                value = raw.decode("utf-8", errors="replace")
+            elif kind == "MESSAGE":
+                if wire != 2: raise ValueError("protobuf MESSAGE wire type 错误")
+                value = cls._decode_message(raw, field["fields"])
+            elif kind == "ENUM":
+                value = ["UNSUPPORTED", "GOOD", "WARNING", "DANGER", "FAULT"][raw] if isinstance(raw, int) and 0 <= raw <= 4 else str(raw)
+            else:
+                value = raw
+            name = field["name"]
+            if field.get("repeated"):
+                result.setdefault(name, []).append(value)
+            else:
+                result[name] = value
+        return result
+
     def _fetch(self, force: bool = False) -> dict:
-        """Fetch a bounded JSON snapshot and retain the last good response on failure."""
+        """Call NAS OpenCLI GetRunOverview directly and decode its protobuf response."""
         with self._lock:
             if not self._enabled:
                 return {"error": "插件未启用"}
-            if not self._api_key:
-                return {"error": "请先在插件设置中填写转换服务访问密钥"}
+            if not self._token:
+                return {"error": "请先在插件设置中填写绿联 NAS API Token"}
             if not force and self._cache is not None and time.monotonic() - self._cache_at < self._refresh_seconds:
                 return {"payload": self._cache, "cached": True}
-            url = self._url
-            key = self._api_key
+            base_url = self._nas_url
+            token = self._token
+            verify_ssl = self._verify_ssl
 
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            return {"error": "转换服务地址必须是有效的 HTTP/HTTPS URL"}
+        parsed = urlparse(base_url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.query or parsed.fragment:
+            return {"error": "NAS 地址格式无效，请填写 https://NAS_IP:9443"}
         if parsed.username or parsed.password:
-            return {"error": "转换服务地址不能包含用户名或密码"}
+            return {"error": "NAS 地址不能包含用户名或密码"}
 
-        request = Request(url, headers={
-            "Accept": "application/json",
-            "X-API-Key": key,
-            "User-Agent": "MoviePilot-UGREEN-NAS-Monitor/1.0",
+        url = base_url.rstrip("/") + "/ugreen/opencli/v1/ugreen.taskmgr.internal.grpc/taskserv.TaskManage/GetRunOverview"
+        request = Request(url, data=b"", method="POST", headers={
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/x-protobuf",
+            "Accept": "application/x-protobuf",
+            "X-OpenCLI-Body-Format": "protobuf",
+            "User-Agent": "MoviePilot-UGREEN-NAS-Monitor/1.1",
         })
+        context = None if verify_ssl else ssl._create_unverified_context()
         try:
-            with urlopen(request, timeout=6) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"HTTP {response.status}")
+            with urlopen(request, timeout=8, context=context) as response:
                 raw = response.read(1024 * 1024 + 1)
                 if len(raw) > 1024 * 1024:
-                    raise RuntimeError("JSON 响应超过 1 MiB 限制")
-            payload = json.loads(raw.decode("utf-8"))
-            if not isinstance(payload, dict) or payload.get("success") is not True or not isinstance(payload.get("data"), dict):
-                raise RuntimeError("NAS API 返回的数据格式不正确")
+                    raise RuntimeError("NAS 响应超过 1 MiB 限制")
+                grpc_code = response.headers.get("X-GRPC-Code", "0")
+                if grpc_code != "0":
+                    raise RuntimeError("NAS 返回 gRPC 错误码 " + grpc_code)
+            overview = self._decode_message(raw, [
+                {"name": "cpu_used_percent", "number": 1, "type": "DOUBLE"},
+                {"name": "cpu_temperature", "number": 2, "type": "INT32"},
+                {"name": "gpu_used_percent", "number": 3, "type": "DOUBLE"},
+                {"name": "mem_used_percent", "number": 4, "type": "DOUBLE"},
+                {"name": "mem_used", "number": 5, "type": "UINT64"},
+                {"name": "mem_total", "number": 6, "type": "UINT64"},
+                {"name": "device_fans", "number": 7, "type": "MESSAGE", "repeated": True, "fields": [
+                    {"name": "speed", "number": 1, "type": "INT32"},
+                ]},
+                {"name": "nets", "number": 8, "type": "MESSAGE", "repeated": True, "fields": [
+                    {"name": "name", "number": 1, "type": "STRING"},
+                    {"name": "send_rate", "number": 2, "type": "UINT64"},
+                    {"name": "recv_rate", "number": 3, "type": "UINT64"},
+                ]},
+                {"name": "disks", "number": 9, "type": "MESSAGE", "repeated": True, "fields": [
+                    {"name": "name", "number": 1, "type": "STRING"},
+                    {"name": "status", "number": 2, "type": "ENUM"},
+                    {"name": "disk_type", "number": 3, "type": "ENUM"},
+                    {"name": "size", "number": 4, "type": "UINT64"},
+                    {"name": "temperature", "number": 5, "type": "INT32"},
+                    {"name": "used_percent", "number": 6, "type": "DOUBLE"},
+                    {"name": "read_rate", "number": 7, "type": "UINT64"},
+                    {"name": "write_rate", "number": 8, "type": "UINT64"},
+                ]},
+                {"name": "volume_read_rate", "number": 10, "type": "UINT64"},
+                {"name": "volume_write_rate", "number": 11, "type": "UINT64"},
+            ])
+            payload = {"success": True, "data": overview}
             with self._lock:
                 self._cache = payload
                 self._cache_at = time.monotonic()
                 self._error = ""
             return {"payload": payload, "cached": False}
-        except (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError, TypeError, AttributeError) as exc:
-            logger.warning("绿联 NAS 监控读取失败：%s", type(exc).__name__)
-            with self._lock:
-                cached = self._cache
-                self._error = "暂时无法连接转换服务，当前显示最近一次成功数据。" if cached else "无法连接转换服务，请检查地址、密钥和网络。"
-            if cached:
-                return {"payload": cached, "cached": True, "warning": self._error}
-            return {"error": self._error}
+        except HTTPError as exc:
+            # Do not expose response bodies that could contain sensitive server details.
+            reason = "NAS 拒绝访问（HTTP %s），请检查 Token 是否有效及是否有任务管理读取权限。" % exc.code
+        except (URLError, TimeoutError, OSError):
+            reason = "无法连接绿联 NAS，请检查地址、9443 端口和网络。"
+        except (ValueError, RuntimeError, TypeError, AttributeError) as exc:
+            reason = "读取或解析 NAS 数据失败：" + str(exc)
+        logger.warning("绿联 NAS 监控读取失败：%s", reason)
+        with self._lock:
+            cached = self._cache
+            self._error = "NAS 暂时不可用，当前显示最近一次成功数据。" if cached else reason
+        if cached:
+            return {"payload": cached, "cached": True, "warning": self._error}
+        return {"error": self._error}
 
     def _view(self) -> tuple[dict | None, str, bool]:
         """Return data, user-safe error text and cache status."""
