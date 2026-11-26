@@ -51,3 +51,9 @@
 - 请求体：Protobuf Empty（空消息）
 - 响应：Protobuf RunOverview，由插件内置轻量解码器解析
 - 默认缓存：15 秒，可在 5–300 秒范围内调整
+
+## 致谢
+
+本项目的插件框架、开发文档与图标资源均来自官方 [MoviePilot-Plugins](https://github.com/jxxghp/MoviePilot-Plugins)。感谢 MoviePilot 项目及其维护者提供的插件生态与开发支持。
+
+本仓库中的绿联 NAS 监控插件是在 MoviePilot V3 插件规范基础上进行的独立开发与适配，相关品牌、产品及接口归其各自权利人所有。
