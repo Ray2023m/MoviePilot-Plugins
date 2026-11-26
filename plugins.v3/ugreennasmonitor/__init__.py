@@ -83,7 +83,7 @@ class UGreenNASMonitor(_PluginBase):
     plugin_name = "绿联 NAS 监控"
     plugin_desc = "读取绿联 UGOS Pro 任务管理状态，展示 CPU、内存、温度、网络和磁盘健康。"
     plugin_icon = "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg"
-    plugin_version = "1.4.0"
+    plugin_version = "1.5.0"
     plugin_author = "Ray2023m"
     author_url = "https://github.com/Ray2023m"
     plugin_config_prefix = "ugreennasmonitor_"
@@ -331,7 +331,7 @@ class UGreenNASMonitor(_PluginBase):
         return result.get("payload"), result.get("error") or result.get("warning", ""), bool(result.get("cached"))
 
     def _build_content(self) -> list[dict]:
-        """Render a compact two-column page designed to avoid vertical scrolling on desktop."""
+        """Render compact overview with full-width network and volume sections."""
         payload, error, cached = self._view()
         if payload is None:
             return [_node("VAlert", error or "暂无 NAS 数据", {"type": "warning", "variant": "tonal"})]
@@ -363,36 +363,39 @@ class UGreenNASMonitor(_PluginBase):
             header.append(_node("VChip", f"风扇 {_fmt(fan_speed, 0)} RPM", {
                 "prepend-icon": "mdi-fan", "size": "x-small", "variant": "outlined", "class": "ml-1",
             }))
+        if cpu_temp is not None:
+            header.append(_node("VChip", f"CPU {_fmt(cpu_temp, 0)} °C", {
+                "prepend-icon": "mdi-thermometer", "size": "x-small", "variant": "outlined", "class": "ml-1",
+            }))
         nodes.append(_node("div", props={"class": "d-flex align-center flex-wrap mb-2"}, content=header))
-
-        # Four compact KPI cards across the full content width.
-        nodes.append(_node("VRow", props={"dense": True}, content=[
-            _metric("CPU", _fmt(cpu) + "%", "mdi-cpu-64-bit", "primary", cpu),
-            _metric("内存", _fmt(mem) + "%", "mdi-memory", "info", mem),
-            _metric("CPU 温度", f"{_fmt(cpu_temp, 0)} °C" if cpu_temp is not None else "—", "mdi-thermometer", "warning"),
-            _metric("GPU", _fmt(gpu) + "%", "mdi-expansion-card", "success", gpu),
-        ]))
 
         mem_used = _number(data.get("mem_used"))
         mem_total = _number(data.get("mem_total"))
-        if mem_total > 0:
-            nodes.append(_node("VCard", props={"variant": "tonal", "class": "px-3 py-2 mt-1 mb-2 rounded-lg"}, content=[
-                _node("div", props={"class": "d-flex align-center justify-space-between mb-1"}, content=[
-                    _node("span", "内存占用", {"class": "text-caption text-medium-emphasis"}),
-                    _node("span", f"{_bytes(mem_used)} / {_bytes(mem_total)} · {_fmt(mem)}%", {"class": "text-caption font-weight-medium"}),
+        memory_value = f"{_bytes(mem_used)} / {_bytes(mem_total)}" if mem_total > 0 else _fmt(mem) + "%"
+        memory_card = _node("VCol", props={"cols": 6, "md": 3}, content=[
+            _node("VCard", props={"variant": "tonal", "class": "pa-3 h-100 rounded-lg"}, content=[
+                _node("div", props={"class": "d-flex align-center ga-2 text-medium-emphasis"}, content=[
+                    _node("VIcon", props={"icon": "mdi-memory", "color": "info", "size": "small"}),
+                    _node("span", "内存占用", {"class": "text-caption"}),
                 ]),
+                _node("div", memory_value, {"class": "text-h6 font-weight-bold mt-2 text-no-wrap"}),
                 _node("VProgressLinear", props={
-                    "model-value": min(100, max(0, mem)), "height": 6, "rounded": True, "color": "info",
+                    "model-value": min(100, max(0, mem)), "height": 5, "rounded": True, "color": "info", "class": "mt-2",
                 }),
-            ]))
-
-        # Desktop: disk inventory on the left, network and throughput on the right.
-        left: list[dict] = [
-            _node("div", props={"class": "d-flex align-center justify-space-between mb-1"}, content=[
-                _node("span", "磁盘与存储", {"class": "text-subtitle-1 font-weight-bold"}),
-                _node("VChip", f"{len(disks)} 块", {"size": "x-small", "variant": "tonal"}),
+                _node("div", _fmt(mem) + "% 已使用", {"class": "text-caption text-medium-emphasis mt-1"}),
             ])
-        ]
+        ])
+        nodes.append(_node("VRow", props={"dense": True}, content=[
+            _metric("CPU 使用率", _fmt(cpu) + "%", "mdi-cpu-64-bit", "primary", cpu),
+            memory_card,
+            _metric("GPU 使用率", _fmt(gpu) + "%", "mdi-expansion-card", "success", gpu),
+        ]))
+
+        # Disk inventory remains the first full-width storage section.
+        nodes.append(_node("div", props={"class": "d-flex align-center justify-space-between mt-3 mb-1"}, content=[
+            _node("span", "磁盘与存储", {"class": "text-subtitle-1 font-weight-bold"}),
+            _node("VChip", f"{len(disks)} 块磁盘", {"size": "x-small", "variant": "tonal"}),
+        ]))
         if disks:
             rows = []
             for disk in disks:
@@ -413,7 +416,7 @@ class UGreenNASMonitor(_PluginBase):
                     _node("td", _rate(disk.get("read_rate"))),
                     _node("td", _rate(disk.get("write_rate"))),
                 ]))
-            left.append(_node("VCard", props={"variant": "outlined", "class": "rounded-lg overflow-hidden"}, content=[
+            nodes.append(_node("VCard", props={"variant": "outlined", "class": "rounded-lg overflow-hidden"}, content=[
                 _node("VTable", props={"density": "compact", "hover": True, "class": "text-caption"}, content=[
                     _node("thead", content=[_node("tr", content=[
                         _node("th", label) for label in ["磁盘", "健康", "温度", "占用", "容量", "读取", "写入"]
@@ -422,59 +425,57 @@ class UGreenNASMonitor(_PluginBase):
                 ])
             ]))
         else:
-            left.append(_node("VAlert", "接口暂未返回磁盘列表。", {"type": "info", "variant": "tonal", "density": "compact"}))
+            nodes.append(_node("VAlert", "接口暂未返回磁盘列表。", {"type": "info", "variant": "tonal", "density": "compact"}))
 
-        right: list[dict] = [
-            _node("div", "网络流量", {"class": "text-subtitle-1 font-weight-bold mb-1"})
-        ]
+        # Restore v1.3-style full-width network section below the disk table.
+        nodes.append(_node("div", "网络流量", {"class": "text-subtitle-1 font-weight-bold mt-3 mb-1"}))
         if networks:
+            network_cards = []
             for net in networks:
                 if not isinstance(net, dict):
                     continue
-                right.append(_node("VCard", props={"variant": "tonal", "class": "pa-2 mb-2 rounded-lg"}, content=[
-                    _node("div", props={"class": "d-flex align-center mb-1"}, content=[
-                        _node("VIcon", props={"icon": "mdi-ethernet", "size": "small", "color": "primary"}),
-                        _node("span", str(net.get("name") or "LAN"), {"class": "text-body-2 font-weight-bold ml-1"}),
-                    ]),
-                    _node("VRow", props={"dense": True}, content=[
-                        _node("VCol", props={"cols": 6}, content=[
-                            _node("div", "↓ 接收", {"class": "text-caption text-medium-emphasis"}),
-                            _node("div", _rate(net.get("recv_rate")), {"class": "text-body-2 font-weight-bold text-no-wrap"}),
+                network_cards.append(_node("VCol", props={"cols": 12, "sm": 6}, content=[
+                    _node("VCard", props={"variant": "tonal", "class": "pa-2 rounded-lg h-100"}, content=[
+                        _node("div", props={"class": "d-flex align-center mb-1"}, content=[
+                            _node("VIcon", props={"icon": "mdi-ethernet", "size": "small", "color": "primary"}),
+                            _node("span", str(net.get("name") or "LAN"), {"class": "text-body-2 font-weight-bold ml-1"}),
                         ]),
-                        _node("VCol", props={"cols": 6}, content=[
-                            _node("div", "↑ 发送", {"class": "text-caption text-medium-emphasis"}),
-                            _node("div", _rate(net.get("send_rate")), {"class": "text-body-2 font-weight-bold text-no-wrap"}),
+                        _node("VRow", props={"dense": True}, content=[
+                            _node("VCol", props={"cols": 6}, content=[
+                                _node("div", "↓ 接收", {"class": "text-caption text-medium-emphasis"}),
+                                _node("div", _rate(net.get("recv_rate")), {"class": "text-body-2 font-weight-bold text-no-wrap"}),
+                            ]),
+                            _node("VCol", props={"cols": 6}, content=[
+                                _node("div", "↑ 发送", {"class": "text-caption text-medium-emphasis"}),
+                                _node("div", _rate(net.get("send_rate")), {"class": "text-body-2 font-weight-bold text-no-wrap"}),
+                            ]),
                         ]),
-                    ]),
+                    ])
                 ]))
+            nodes.append(_node("VRow", props={"dense": True}, content=network_cards))
         else:
-            right.append(_node("VAlert", "暂无网卡数据", {"type": "info", "variant": "tonal", "density": "compact"}))
+            nodes.append(_node("VAlert", "暂无网卡数据", {"type": "info", "variant": "tonal", "density": "compact"}))
 
-        right.append(_node("div", "存储卷吞吐", {"class": "text-subtitle-1 font-weight-bold mt-2 mb-1"}))
-        right.append(_node("VRow", props={"dense": True}, content=[
-            _node("VCol", props={"cols": 6}, content=[
+        nodes.append(_node("div", "存储卷吞吐", {"class": "text-subtitle-1 font-weight-bold mt-3 mb-1"}))
+        nodes.append(_node("VRow", props={"dense": True}, content=[
+            _node("VCol", props={"cols": 12, "sm": 6}, content=[
                 _node("VCard", props={"variant": "tonal", "class": "pa-2 rounded-lg h-100"}, content=[
                     _node("div", props={"class": "d-flex align-center"}, content=[
                         _node("VIcon", props={"icon": "mdi-download", "color": "success", "size": "small"}),
-                        _node("span", "卷读取", {"class": "text-caption ml-1"}),
+                        _node("span", "卷读取速度", {"class": "text-caption ml-1"}),
                     ]),
-                    _node("div", _rate(data.get("volume_read_rate")), {"class": "text-body-2 font-weight-bold mt-1 text-no-wrap"}),
+                    _node("div", _rate(data.get("volume_read_rate")), {"class": "text-body-2 font-weight-bold mt-1"}),
                 ])
             ]),
-            _node("VCol", props={"cols": 6}, content=[
+            _node("VCol", props={"cols": 12, "sm": 6}, content=[
                 _node("VCard", props={"variant": "tonal", "class": "pa-2 rounded-lg h-100"}, content=[
                     _node("div", props={"class": "d-flex align-center"}, content=[
                         _node("VIcon", props={"icon": "mdi-upload", "color": "info", "size": "small"}),
-                        _node("span", "卷写入", {"class": "text-caption ml-1"}),
+                        _node("span", "卷写入速度", {"class": "text-caption ml-1"}),
                     ]),
-                    _node("div", _rate(data.get("volume_write_rate")), {"class": "text-body-2 font-weight-bold mt-1 text-no-wrap"}),
+                    _node("div", _rate(data.get("volume_write_rate")), {"class": "text-body-2 font-weight-bold mt-1"}),
                 ])
             ]),
-        ]))
-
-        nodes.append(_node("VRow", props={"dense": True}, content=[
-            _node("VCol", props={"cols": 12, "lg": 8}, content=left),
-            _node("VCol", props={"cols": 12, "lg": 4}, content=right),
         ]))
         return nodes
 
