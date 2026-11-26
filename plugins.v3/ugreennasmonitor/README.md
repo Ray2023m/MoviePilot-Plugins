@@ -1,6 +1,6 @@
 # 绿联 NAS 监控（MoviePilot V3）
 
-在 MoviePilot V3 插件详情页和首页仪表板查看绿联 UGOS Pro NAS 状态。
+直接通过绿联 UGOS Pro OpenCLI API 读取 NAS 监控数据，在 MoviePilot 插件详情页和仪表板展示。
 
 ## 功能
 
@@ -9,58 +9,40 @@
 - HDD / SSD 健康状态、温度、容量、使用率、读写速度
 - LAN 网卡收发速度
 - 存储卷读写速度
-- 最近一次成功数据缓存；转换服务暂时不可用时保留最后一次成功结果
+- 最近一次成功数据缓存；NAS 暂时不可用时保留最后一次成功结果
 - 只读访问，不执行 NAS 写入操作
 
 ## 前置条件
 
-需要先在 NAS 侧或同一内网主机部署 JSON 转换服务。当前插件使用已验证的接口：
+- 绿联 UGOS Pro，已启用 OpenCLI 访问令牌
+- 令牌至少具有「任务管理」的只读权限（taskmgr_get_run_overview）
+- MoviePilot 容器能够访问 NAS 的 HTTPS 管理端口（默认 9443）
 
-`http://10.10.10.233:8765/api/ugreen`
+## 安装与配置
 
-转换服务请求头：
-
-`X-API-Key: <bridge-api-key>`
-
-响应结构应与 `unc taskmgr overview` 一致：
-
-```json
-{
-  "success": true,
-  "data": {
-    "cpu_used_percent": 12.53,
-    "cpu_temperature": 34,
-    "gpu_used_percent": 0,
-    "mem_used_percent": 40.38,
-    "mem_used": "6677118976",
-    "mem_total": "16535777280",
-    "device_fans": [{"speed": 660}],
-    "nets": [{"name": "LAN1", "send_rate": "0", "recv_rate": "0"}],
-    "disks": []
-  }
-}
-```
-
-## 安装
-
-1. 在 GitHub 创建公开仓库 `Ray2023m/MoviePilot-Plugins`。
-2. 将本仓库文件按原目录提交到仓库 `main` 分支。
-3. MoviePilot 设置中将 `PLUGIN_MARKET` 增加：
+1. 在 MoviePilot 设置中将 `PLUGIN_MARKET` 增加：
    `https://github.com/Ray2023m/MoviePilot-Plugins`
-4. 在插件市场刷新并安装「绿联 NAS 监控」。
-5. 在插件设置中启用插件，填写转换服务 URL 和 `API_KEY`。
-6. 保存后打开插件详情页；如需首页展示，在 MoviePilot 仪表板编辑中手动添加「绿联 NAS 状态」。
+2. 刷新插件市场并安装「绿联 NAS 监控」。
+3. 在插件设置中启用插件。
+4. NAS 地址填写例如 `https://10.10.10.10:9443`。
+5. 填写绿联后台生成的访问令牌（`ugpoa_v1.` 开头）。
+6. NAS 使用自签 HTTPS 证书时，关闭「验证 HTTPS 证书」；若使用受信任证书则建议开启。
+7. 保存后打开插件详情页。如需首页展示，在仪表板编辑中手动添加「绿联 NAS 状态」。
 
 ## 安全
 
-- NAS OpenCLI Token 只保存在 JSON 转换服务，不要填入 MoviePilot 插件或 GitHub。
-- 插件只保存转换服务的 API_KEY。请使用随机生成的高强度密钥。
-- 不要把转换服务端口暴露到公网。
-- 建议转换服务仅监听内网地址，并限制访问来源。
-- 插件请求超时为 6 秒，最大读取响应体为 1 MiB；日志不会输出 URL 查询参数或密钥。
+- 令牌只保存在 MoviePilot 本机插件配置中，不写入 Git 仓库。
+- 建议使用只读、最小权限令牌；本插件只调用 Task Manager 的 `GetRunOverview`。
+- 不要把访问令牌提交到 GitHub、日志或公开聊天。
+- 建议不要将 NAS 的 OpenCLI 端口直接暴露到公网。
 
-## 说明
+## 接口与兼容性
 
-- 插件只负责读取和展示数据；NAS 指标的采样频率由 UGOS API 决定。
-- 页面刷新与仪表板刷新会命中插件缓存，默认缓存 15 秒。
-- 仪表板组件需要用户手动添加，不会擅自修改已有仪表板布局。
+- HTTP：`POST /ugreen/opencli/v1/ugreen.taskmgr.internal.grpc/taskserv.TaskManage/GetRunOverview`
+- 认证：`Authorization: Bearer <access-token>`
+- 请求体：Protobuf Empty（空消息）
+- 响应：Protobuf RunOverview，由插件内置的轻量解码器解析。
+- 默认缓存 15 秒，配置范围 5–300 秒。
+- NAS 固件升级后如字段协议变化，可能需要更新插件解码器。
+
+仪表板组件需要用户手动添加，不会擅自修改已有仪表板布局。
