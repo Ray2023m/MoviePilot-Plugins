@@ -81,7 +81,7 @@ class UGreenNASMonitor(_PluginBase):
 
     plugin_name = "绿联 NAS 监控"
     plugin_desc = "读取绿联 UGOS Pro 任务管理状态，展示 CPU、内存、温度、网络和磁盘健康。"
-    plugin_icon = "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg"
+    plugin_icon = "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.png"
     plugin_version = "1.0.0"
     plugin_author = "Ray2023m"
     author_url = "https://github.com/Ray2023m"
