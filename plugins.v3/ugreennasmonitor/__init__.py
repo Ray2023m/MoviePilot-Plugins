@@ -1,7 +1,6 @@
 """MoviePilot V3 plugin for read-only UGREEN NAS monitoring."""
 from __future__ import annotations
 
-import json
 import ssl
 import struct
 import threading
