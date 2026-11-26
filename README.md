@@ -4,7 +4,4 @@
 
 ## 插件列表
 
-- **绿联 NAS 监控（UGreenNASMonitor）**：查看 UGOS Pro 的 CPU、内存、温度、风扇、磁盘、网络及存储卷状态。
-
-
-```
+- **绿联 NAS 监控（UGreenNASMonitor）**：直接通过绿联 OpenCLI API 读取 UGOS Pro 的 CPU、内存、温度、风扇、磁盘和网络状态；无需额外 JSON Bridge。
