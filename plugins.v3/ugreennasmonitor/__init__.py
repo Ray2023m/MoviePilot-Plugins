@@ -57,24 +57,41 @@ def _rate(value: Any) -> str:
 
 def _metric(title: str, value: str, icon: str, color: str = "primary",
             progress: float | None = None, hint: str | None = None) -> dict:
-    """Build a responsive native-style metric card."""
+    """Render a compact glass-style metric tile."""
+    tint = {
+        "primary": "rgba(59,130,246,.18)",
+        "info": "rgba(139,92,246,.18)",
+        "success": "rgba(16,185,129,.18)",
+        "warning": "rgba(245,158,11,.18)",
+        "error": "rgba(239,68,68,.18)",
+    }.get(color, "rgba(59,130,246,.18)")
     content = [
-        _node("div", props={"class": "d-flex align-center ga-2 text-medium-emphasis"}, content=[
-            _node("VIcon", props={"icon": icon, "color": color, "size": "small"}),
-            _node("span", title, {"class": "text-caption", "style": "min-height: 20px; display: flex; align-items: center;"}),
+        _node("div", props={
+            "class": "d-flex align-center justify-center rounded-lg mb-3",
+            "style": f"width:48px;height:48px;background:{tint};",
+        }, content=[
+            _node("VIcon", props={"icon": icon, "color": color, "size": "24"})
         ]),
-        _node("div", value, {"class": "text-h5 font-weight-bold mt-2 text-no-wrap", "style": "min-height: 36px; line-height: 36px; font-variant-numeric: tabular-nums;"}),
+        _node("div", value, {"class": "text-h5 font-weight-bold text-no-wrap",
+                             "style": "line-height:1.25;font-variant-numeric:tabular-nums;letter-spacing:-.02em;"}),
+        _node("div", title, {"class": "text-body-2 text-medium-emphasis mt-1"}),
     ]
     if progress is not None:
         content.append(_node("VProgressLinear", props={
-            "model-value": min(100, max(0, progress)), "height": 5,
-            "rounded": True, "color": color, "class": "mt-2",
+            "model-value": min(100, max(0, progress)), "height": 6,
+            "rounded": True, "color": color, "class": "mt-3",
+            "bg-color": "rgba(148,163,184,.18)",
         }))
     if hint:
-        content.append(_node("div", hint, {"class": "text-caption text-medium-emphasis mt-1"}))
-    return _node("VCol", props={"cols": 6, "md": 3}, content=[
-        _node("VCard", props={"variant": "tonal", "class": "pa-3 h-100 rounded-lg"}, content=content)
+        content.append(_node("div", hint, {"class": "text-caption text-medium-emphasis mt-2",
+                                           "style": "font-variant-numeric:tabular-nums;"}))
+    return _node("VCol", props={"cols": 12, "sm": 6, "lg": 3}, content=[
+        _node("VCard", props={
+            "variant": "flat", "class": "pa-4 h-100 rounded-xl",
+            "style": "background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.11);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 8px 24px rgba(0,0,0,.08);",
+        }, content=content)
     ])
+
 
 class UGreenNASMonitor(_PluginBase):
     """Display read-only UGREEN NAS health data in the plugin detail page."""
@@ -330,7 +347,7 @@ class UGreenNASMonitor(_PluginBase):
         return result.get("payload"), result.get("error") or result.get("warning", ""), bool(result.get("cached"))
 
     def _build_content(self) -> list[dict]:
-        """Render compact overview with full-width network and volume sections."""
+        """Render a glass-style NAS overview with CPU, memory, GPU, disks and network."""
         payload, error, cached = self._view()
         if payload is None:
             return [_node("VAlert", error or "暂无 NAS 数据", {"type": "warning", "variant": "tonal"})]
@@ -352,130 +369,153 @@ class UGreenNASMonitor(_PluginBase):
 
         header = [
             _node("span", "绿联 NAS · DXP4800", {"class": "text-subtitle-1 font-weight-bold"}),
-            _node("span", "数据已更新" if not cached else "使用缓存数据", {"class": "text-caption text-medium-emphasis ml-2"}),
+            _node("span", "数据已更新" if not cached else "使用缓存数据",
+                  {"class": "text-caption text-medium-emphasis ml-2"}),
             _node("VChip", "磁盘正常" if disks and good_count == len(disks) else
                   f"磁盘异常 {len(disks) - good_count}/{len(disks)}" if disks else "磁盘状态未知",
                   {"color": "success" if disks and good_count == len(disks) else "warning",
-                   "size": "x-small", "variant": "tonal", "class": "ml-3"}),
+                   "size": "small", "variant": "tonal", "class": "ml-2"}),
         ]
         if cpu_temp is not None:
             header.append(_node("VChip", f"CPU {_fmt(cpu_temp, 0)} °C", {
-                "prepend-icon": "mdi-thermometer", "size": "x-small", "variant": "outlined", "class": "ml-1",
+                "prepend-icon": "mdi-thermometer", "size": "small", "variant": "outlined", "class": "ml-1",
             }))
         if fan_speed is not None:
             header.append(_node("VChip", f"风扇 {_fmt(fan_speed, 0)} RPM", {
-                "prepend-icon": "mdi-fan", "size": "x-small", "variant": "outlined", "class": "ml-1",
+                "prepend-icon": "mdi-fan", "size": "small", "variant": "outlined", "class": "ml-1",
             }))
-        nodes.append(_node("div", props={"class": "d-flex align-center flex-wrap mb-2"}, content=header))
+        nodes.append(_node("div", props={"class": "d-flex align-center flex-wrap mb-3"}, content=header))
 
         mem_used = _number(data.get("mem_used"))
         mem_total = _number(data.get("mem_total"))
-        memory_value = f"{_bytes(mem_used)} / {_bytes(mem_total)}" if mem_total > 0 else _fmt(mem) + "%"
-        memory_card = _node("VCol", props={"cols": 6, "md": 3}, content=[
-            _node("VCard", props={"variant": "tonal", "class": "pa-3 h-100 rounded-lg"}, content=[
-                _node("div", props={"class": "d-flex align-center ga-2 text-medium-emphasis"}, content=[
-                    _node("VIcon", props={"icon": "mdi-memory", "color": "info", "size": "small"}),
-                    _node("span", "内存占用", {"class": "text-caption"}),
-                ]),
-                _node("div", memory_value, {"class": "text-h5 font-weight-bold mt-2 text-no-wrap", "style": "min-height: 36px; line-height: 36px; font-variant-numeric: tabular-nums;"}),
-                _node("VProgressLinear", props={
-                    "model-value": min(100, max(0, mem)), "height": 5, "rounded": True, "color": "info", "class": "mt-2",
-                }),
-                _node("div", _fmt(mem) + "% 已使用", {"class": "text-caption text-medium-emphasis mt-1", "style": "font-variant-numeric: tabular-nums;"}),
-            ])
-        ])
-        nodes.append(_node("VRow", props={"dense": True}, content=[
-            _metric("CPU 使用率", _fmt(cpu) + "%", "mdi-cpu-64-bit", "primary", cpu),
-            _metric("内存使用率", _fmt(mem) + "%", "mdi-memory", "info", mem),
-            memory_card,
-            _metric("GPU 使用率", _fmt(gpu) + "%", "mdi-expansion-card", "success", gpu),
+        memory_hint = f"{_bytes(mem_used)} / {_bytes(mem_total)} 已使用" if mem_total > 0 else "内存占用"
+        nodes.append(_node("VRow", props={"dense": True, "class": "ga-2"}, content=[
+            _metric("CPU 使用率", _fmt(cpu) + "%", "mdi-cpu-64-bit", "primary", cpu,
+                    f"温度 {_fmt(cpu_temp, 0)} °C" if cpu_temp is not None else "处理器负载"),
+            _metric("内存使用率", _fmt(mem) + "%", "mdi-memory", "info", mem, memory_hint),
+            _metric("GPU 使用率", _fmt(gpu) + "%", "mdi-expansion-card", "success", gpu, "图形处理器负载"),
+            _metric("CPU 风扇", f"{_fmt(fan_speed, 0)} RPM" if fan_speed is not None else "—",
+                    "mdi-fan", "warning", None, "当前风扇转速"),
         ]))
 
-        # Disk inventory remains the first full-width storage section.
-        nodes.append(_node("div", props={"class": "d-flex align-center justify-space-between mt-3 mb-1"}, content=[
+        nodes.append(_node("div", props={"class": "d-flex align-center justify-space-between mt-4 mb-2"}, content=[
             _node("span", "磁盘与存储", {"class": "text-subtitle-1 font-weight-bold"}),
-            _node("VChip", f"{len(disks)} 块磁盘", {"size": "x-small", "variant": "tonal"}),
+            _node("VChip", f"{len(disks)} 块磁盘", {"size": "small", "variant": "tonal"}),
         ]))
         if disks:
-            rows = []
+            disk_cards = []
             for disk in disks:
                 if not isinstance(disk, dict):
                     continue
                 status = str(disk.get("status") or "UNKNOWN")
                 good = status.upper() == "GOOD"
                 temp = disk.get("temperature")
-                rows.append(_node("tr", content=[
-                    _node("td", str(disk.get("name") or "未命名"), {"class": "text-no-wrap"}),
-                    _node("td", content=[_node("VChip", status, {
-                        "color": "success" if good else "error" if status.upper() in ("DANGER", "FAULT") else "warning",
-                        "size": "x-small", "variant": "tonal",
-                    })]),
-                    _node("td", f"{_fmt(temp, 0)}°" if temp is not None else "—"),
-                    _node("td", _fmt(disk.get("used_percent"), 0) + "%"),
-                    _node("td", _bytes(disk.get("size"))),
-                    _node("td", _rate(disk.get("read_rate"))),
-                    _node("td", _rate(disk.get("write_rate"))),
+                used = _number(disk.get("used_percent"))
+                disk_cards.append(_node("VCol", props={"cols": 12, "sm": 6, "lg": 4}, content=[
+                    _node("VCard", props={
+                        "variant": "flat", "class": "pa-4 h-100 rounded-xl",
+                        "style": "background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.11);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);",
+                    }, content=[
+                        _node("div", props={"class": "d-flex align-center justify-space-between mb-3"}, content=[
+                            _node("div", props={"class": "d-flex align-center ga-2"}, content=[
+                                _node("div", props={"class": "d-flex align-center justify-center rounded-lg",
+                                                    "style": "width:42px;height:42px;background:rgba(59,130,246,.16);"}, content=[
+                                    _node("VIcon", props={"icon": "mdi-harddisk", "color": "info", "size": "22"})
+                                ]),
+                                _node("div", props={"class": "min-width-0"}, content=[
+                                    _node("div", str(disk.get("name") or "未命名磁盘"),
+                                          {"class": "text-body-1 font-weight-bold text-truncate"}),
+                                    _node("div", str(disk.get("disk_type") or "磁盘"),
+                                          {"class": "text-caption text-medium-emphasis"}),
+                                ]),
+                            ]),
+                            _node("VChip", "健康" if good else status, {
+                                "color": "success" if good else "error" if status.upper() in ("DANGER", "FAULT") else "warning",
+                                "size": "small", "variant": "tonal",
+                            }),
+                        ]),
+                        _node("div", props={"class": "d-flex align-center justify-space-between mb-1"}, content=[
+                            _node("span", "空间占用", {"class": "text-caption text-medium-emphasis"}),
+                            _node("span", _fmt(used, 0) + "%", {"class": "text-body-2 font-weight-bold",
+                                                                 "style": "font-variant-numeric:tabular-nums;"}),
+                        ]),
+                        _node("VProgressLinear", props={"model-value": min(100, max(0, used)),
+                                                        "height": 6, "rounded": True, "color": "info",
+                                                        "bg-color": "rgba(148,163,184,.18)"}),
+                        _node("div", props={"class": "d-flex justify-space-between mt-3"}, content=[
+                            _node("div", props={"class": "d-flex align-center ga-1"}, content=[
+                                _node("VIcon", props={"icon": "mdi-thermometer", "size": "small", "color": "warning"}),
+                                _node("span", f"{_fmt(temp, 0)} °C" if temp is not None else "温度 —",
+                                      {"class": "text-caption text-medium-emphasis"}),
+                            ]),
+                            _node("span", _bytes(disk.get("size")), {"class": "text-caption text-medium-emphasis"}),
+                        ]),
+                        _node("div", props={"class": "d-flex justify-space-between mt-2 pt-2",
+                                            "style": "border-top:1px solid rgba(148,163,184,.16);"}, content=[
+                            _node("div", props={"class": "d-flex align-center ga-1"}, content=[
+                                _node("VIcon", props={"icon": "mdi-download", "size": "small", "color": "success"}),
+                                _node("span", _rate(disk.get("read_rate")), {"class": "text-caption font-weight-medium"}),
+                            ]),
+                            _node("div", props={"class": "d-flex align-center ga-1"}, content=[
+                                _node("VIcon", props={"icon": "mdi-upload", "size": "small", "color": "warning"}),
+                                _node("span", _rate(disk.get("write_rate")), {"class": "text-caption font-weight-medium"}),
+                            ]),
+                        ]),
+                    ])
                 ]))
-            nodes.append(_node("VCard", props={"variant": "outlined", "class": "rounded-lg overflow-hidden"}, content=[
-                _node("VTable", props={"density": "compact", "hover": True, "class": "text-caption"}, content=[
-                    _node("thead", content=[_node("tr", content=[
-                        _node("th", label) for label in ["磁盘", "健康", "温度", "占用", "容量", "读取", "写入"]
-                    ])]),
-                    _node("tbody", content=rows),
-                ])
-            ]))
+            nodes.append(_node("VRow", props={"dense": True, "class": "ga-2"}, content=disk_cards))
         else:
-            nodes.append(_node("VAlert", "接口暂未返回磁盘列表。", {"type": "info", "variant": "tonal", "density": "compact"}))
+            nodes.append(_node("VAlert", "接口暂未返回磁盘列表。", {
+                "type": "info", "variant": "tonal", "density": "compact",
+            }))
 
-        # Restore v1.3-style full-width network section below the disk table.
-        nodes.append(_node("div", "网络流量", {"class": "text-subtitle-1 font-weight-bold mt-3 mb-1"}))
+        nodes.append(_node("div", "网络流量", {"class": "text-subtitle-1 font-weight-bold mt-4 mb-2"}))
         if networks:
             network_cards = []
             for net in networks:
                 if not isinstance(net, dict):
                     continue
-                network_cards.append(_node("VCol", props={"cols": 12, "sm": 6}, content=[
-                    _node("VCard", props={"variant": "tonal", "class": "pa-2 rounded-lg h-100"}, content=[
-                        _node("div", props={"class": "d-flex align-center mb-1"}, content=[
-                            _node("VIcon", props={"icon": "mdi-ethernet", "size": "small", "color": "primary"}),
-                            _node("span", str(net.get("name") or "LAN"), {"class": "text-body-2 font-weight-bold ml-1"}),
+                network_cards.append(_node("VCol", props={"cols": 12, "sm": 6, "lg": 4}, content=[
+                    _node("VCard", props={
+                        "variant": "flat", "class": "pa-4 h-100 rounded-xl",
+                        "style": "background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.11);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);",
+                    }, content=[
+                        _node("div", props={"class": "d-flex align-center ga-2 mb-3"}, content=[
+                            _node("div", props={"class": "d-flex align-center justify-center rounded-lg",
+                                                "style": "width:42px;height:42px;background:rgba(59,130,246,.16);"}, content=[
+                                _node("VIcon", props={"icon": "mdi-ethernet", "color": "primary", "size": "22"})
+                            ]),
+                            _node("div", str(net.get("name") or "网络接口"),
+                                  {"class": "text-body-1 font-weight-bold"}),
                         ]),
                         _node("VRow", props={"dense": True}, content=[
                             _node("VCol", props={"cols": 6}, content=[
-                                _node("div", "↓ 接收", {"class": "text-caption text-medium-emphasis"}),
-                                _node("div", _rate(net.get("recv_rate")), {"class": "text-body-2 font-weight-bold text-no-wrap"}),
+                                _node("div", props={"class": "d-flex align-center ga-1 mb-1"}, content=[
+                                    _node("VIcon", props={"icon": "mdi-arrow-down-bold", "color": "warning", "size": "small"}),
+                                    _node("span", "下载 / 接收", {"class": "text-caption text-medium-emphasis"}),
+                                ]),
+                                _node("div", _rate(net.get("recv_rate")), {"class": "text-h6 font-weight-bold text-no-wrap",
+                                                                           "style": "font-variant-numeric:tabular-nums;"}),
                             ]),
                             _node("VCol", props={"cols": 6}, content=[
-                                _node("div", "↑ 发送", {"class": "text-caption text-medium-emphasis"}),
-                                _node("div", _rate(net.get("send_rate")), {"class": "text-body-2 font-weight-bold text-no-wrap"}),
+                                _node("div", props={"class": "d-flex align-center ga-1 mb-1"}, content=[
+                                    _node("VIcon", props={"icon": "mdi-arrow-up-bold", "color": "success", "size": "small"}),
+                                    _node("span", "上传 / 发送", {"class": "text-caption text-medium-emphasis"}),
+                                ]),
+                                _node("div", _rate(net.get("send_rate")), {"class": "text-h6 font-weight-bold text-no-wrap",
+                                                                           "style": "font-variant-numeric:tabular-nums;"}),
                             ]),
                         ]),
                     ])
                 ]))
-            nodes.append(_node("VRow", props={"dense": True}, content=network_cards))
+            nodes.append(_node("VRow", props={"dense": True, "class": "ga-2"}, content=network_cards))
         else:
             nodes.append(_node("VAlert", "暂无网卡数据", {"type": "info", "variant": "tonal", "density": "compact"}))
 
-        nodes.append(_node("div", "存储卷吞吐", {"class": "text-subtitle-1 font-weight-bold mt-3 mb-1"}))
-        nodes.append(_node("VRow", props={"dense": True}, content=[
-            _node("VCol", props={"cols": 12, "sm": 6}, content=[
-                _node("VCard", props={"variant": "tonal", "class": "pa-2 rounded-lg h-100"}, content=[
-                    _node("div", props={"class": "d-flex align-center"}, content=[
-                        _node("VIcon", props={"icon": "mdi-download", "color": "success", "size": "small"}),
-                        _node("span", "卷读取速度", {"class": "text-caption ml-1"}),
-                    ]),
-                    _node("div", _rate(data.get("volume_read_rate")), {"class": "text-body-2 font-weight-bold mt-1"}),
-                ])
-            ]),
-            _node("VCol", props={"cols": 12, "sm": 6}, content=[
-                _node("VCard", props={"variant": "tonal", "class": "pa-2 rounded-lg h-100"}, content=[
-                    _node("div", props={"class": "d-flex align-center"}, content=[
-                        _node("VIcon", props={"icon": "mdi-upload", "color": "info", "size": "small"}),
-                        _node("span", "卷写入速度", {"class": "text-caption ml-1"}),
-                    ]),
-                    _node("div", _rate(data.get("volume_write_rate")), {"class": "text-body-2 font-weight-bold mt-1"}),
-                ])
-            ]),
+        nodes.append(_node("div", "存储卷吞吐", {"class": "text-subtitle-1 font-weight-bold mt-4 mb-2"}))
+        nodes.append(_node("VRow", props={"dense": True, "class": "ga-2"}, content=[
+            _metric("卷读取速度", _rate(data.get("volume_read_rate")), "mdi-download", "success"),
+            _metric("卷写入速度", _rate(data.get("volume_write_rate")), "mdi-upload", "warning"),
         ]))
         return nodes
 
