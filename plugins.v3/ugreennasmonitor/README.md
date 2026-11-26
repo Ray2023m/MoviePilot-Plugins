@@ -1,6 +1,6 @@
 # 绿联 NAS 监控（MoviePilot V3）
 
-直接通过绿联 UGOS Pro OpenCLI API 读取 NAS 监控数据，在 MoviePilot 插件详情页和仪表板展示。
+直接通过绿联 UGOS Pro OpenCLI API 读取 NAS 监控数据，仅在 MoviePilot 插件详情页展示。
 
 ## v1.2.0 界面优化
 
@@ -18,6 +18,7 @@
 - HDD / SSD 健康状态、温度、容量、使用率、读写速度
 - LAN 网卡收发速度
 - 存储卷读写速度
+- 仅保留插件详情页展示，不注册首页仪表板组件
 - 最近一次成功数据缓存；NAS 暂时不可用时保留最后一次成功结果
 - 只读访问，不执行 NAS 写入操作
 
