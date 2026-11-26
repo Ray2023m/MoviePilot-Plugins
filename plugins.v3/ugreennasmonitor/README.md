@@ -1,7 +1,7 @@
 # 绿联 NAS 监控（MoviePilot V3）
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg" width="96" alt="绿联 NAS 监控图标">
+  <img src="https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.png" width="96" alt="绿联 NAS 监控图标">
 </p>
 
 通过绿联 UGOS Pro OpenCLI 只读接口获取 NAS 运行概览，在 MoviePilot 插件详情页展示状态。
