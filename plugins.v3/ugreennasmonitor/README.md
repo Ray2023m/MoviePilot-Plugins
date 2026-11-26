@@ -1,66 +1,53 @@
 # 绿联 NAS 监控（MoviePilot V3）
 
-在 MoviePilot V3 插件详情页和首页仪表板查看绿联 UGOS Pro NAS 状态。
+< p align="center">
+  <img src="https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg" width="96" alt="绿联 NAS 监控图标">
+</p>
 
-## 功能
+通过绿联 UGOS Pro OpenCLI 只读接口获取 NAS 运行概览，在 MoviePilot 插件详情页展示状态。
+
+## v1.0.0 首发功能
 
 - CPU、GPU、内存使用率
-- CPU 温度、风扇转速
+- CPU 温度与风扇转速
 - HDD / SSD 健康状态、温度、容量、使用率、读写速度
-- LAN 网卡收发速度
-- 存储卷读写速度
-- 最近一次成功数据缓存；转换服务暂时不可用时保留最后一次成功结果
-- 只读访问，不执行 NAS 写入操作
+- 网卡实时接收与发送速度
+- 存储卷读写吞吐
+- 指标卡片、磁盘状态标签及响应式布局
+- NAS 数据本地缓存；短暂连接失败时保留最近一次成功数据
+- 仅调用只读监控接口，不执行 NAS 写入操作
 
-## 前置条件
+## 环境要求
 
-需要先在 NAS 侧或同一内网主机部署 JSON 转换服务。当前插件使用已验证的接口：
+- MoviePilot V3（系统版本 3.2.3 或更高，且低于 4）
+- 绿联 UGOS Pro，已启用 OpenCLI 访问令牌
+- Token 至少具有「任务管理」读取权限（`taskmgr_get_run_overview`）
+- MoviePilot 容器能够访问 NAS 的 HTTPS 管理端口（默认 9443）
 
-`http://10.10.10.233:8765/api/ugreen`
+## 安装与配置
 
-转换服务请求头：
+1. 在 MoviePilot 插件市场添加仓库：
 
-`X-API-Key: <bridge-api-key>`
-
-响应结构应与 `unc taskmgr overview` 一致：
-
-```json
-{
-  "success": true,
-  "data": {
-    "cpu_used_percent": 12.53,
-    "cpu_temperature": 34,
-    "gpu_used_percent": 0,
-    "mem_used_percent": 40.38,
-    "mem_used": "6677118976",
-    "mem_total": "16535777280",
-    "device_fans": [{"speed": 660}],
-    "nets": [{"name": "LAN1", "send_rate": "0", "recv_rate": "0"}],
-    "disks": []
-  }
-}
-```
-
-## 安装
-
-1. 在 GitHub 创建公开仓库 `Ray2023m/MoviePilot-Plugins`。
-2. 将本仓库文件按原目录提交到仓库 `main` 分支。
-3. MoviePilot 设置中将 `PLUGIN_MARKET` 增加：
    `https://github.com/Ray2023m/MoviePilot-Plugins`
-4. 在插件市场刷新并安装「绿联 NAS 监控」。
-5. 在插件设置中启用插件，填写转换服务 URL 和 `API_KEY`。
-6. 保存后打开插件详情页；如需首页展示，在 MoviePilot 仪表板编辑中手动添加「绿联 NAS 状态」。
+2. 刷新插件市场并安装「绿联 NAS 监控」。
+3. 在插件设置中启用监控。
+4. NAS 地址填写根地址，例如 `https://10.10.10.10:9443`，不要附加 API 路径。
+5. 填写绿联 NAS 后台生成的 API Token（通常以 `ugpoa_v1.` 开头）。
+6. NAS 使用自签名证书时关闭「验证 HTTPS 证书」；使用可信证书时建议开启。
+7. 保存设置后进入插件详情页查看监控数据。
 
-## 安全
+## 安全说明
 
-- NAS OpenCLI Token 只保存在 JSON 转换服务，不要填入 MoviePilot 插件或 GitHub。
-- 插件只保存转换服务的 API_KEY。请使用随机生成的高强度密钥。
-- 不要把转换服务端口暴露到公网。
-- 建议转换服务仅监听内网地址，并限制访问来源。
-- 插件请求超时为 6 秒，最大读取响应体为 1 MiB；日志不会输出 URL 查询参数或密钥。
+- Token 仅保存在 MoviePilot 本机插件配置中，不会写入仓库。
+- 建议使用仅含任务管理读取权限的最小权限 Token。
+- 不要将 Token 提交到 GitHub、日志或公开聊天中。
+- 不建议将 NAS 的 OpenCLI 管理端口直接暴露到公网。
 
-## 说明
+## 接口说明
 
-- 插件只负责读取和展示数据；NAS 指标的采样频率由 UGOS API 决定。
-- 页面刷新与仪表板刷新会命中插件缓存，默认缓存 15 秒。
-- 仪表板组件需要用户手动添加，不会擅自修改已有仪表板布局。
+- 请求方式：`POST`
+- 接口路径：`/ugreen/opencli/v1/ugreen.taskmgr.internal.grpc/taskserv.TaskManage/GetRunOverview`
+- 认证方式：`Authorization: Bearer <access-token>`
+- 请求体：Protobuf Empty（空消息）
+- 响应：Protobuf RunOverview，由插件内置轻量解码器解析
+- 默认缓存：15 秒，可在 5–300 秒范围内调整
