@@ -62,9 +62,9 @@ def _metric(title: str, value: str, icon: str, color: str = "primary",
     content = [
         _node("div", props={"class": "d-flex align-center ga-2 text-medium-emphasis"}, content=[
             _node("VIcon", props={"icon": icon, "color": color, "size": "small"}),
-            _node("span", title, {"class": "text-caption"}),
+            _node("span", title, {"class": "text-caption", "style": "min-height: 20px; display: flex; align-items: center;"}),
         ]),
-        _node("div", value, {"class": "text-h5 font-weight-bold mt-2"}),
+        _node("div", value, {"class": "text-h5 font-weight-bold mt-2 text-no-wrap", "style": "min-height: 36px; line-height: 36px; font-variant-numeric: tabular-nums;"}),
     ]
     if progress is not None:
         content.append(_node("VProgressLinear", props={
@@ -83,7 +83,7 @@ class UGreenNASMonitor(_PluginBase):
     plugin_name = "绿联 NAS 监控"
     plugin_desc = "读取绿联 UGOS Pro 任务管理状态，展示 CPU、内存、温度、网络和磁盘健康。"
     plugin_icon = "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg"
-    plugin_version = "1.5.0"
+    plugin_version = "1.5.1"
     plugin_author = "Ray2023m"
     author_url = "https://github.com/Ray2023m"
     plugin_config_prefix = "ugreennasmonitor_"
@@ -359,13 +359,13 @@ class UGreenNASMonitor(_PluginBase):
                   {"color": "success" if disks and good_count == len(disks) else "warning",
                    "size": "x-small", "variant": "tonal", "class": "ml-3"}),
         ]
-        if fan_speed is not None:
-            header.append(_node("VChip", f"风扇 {_fmt(fan_speed, 0)} RPM", {
-                "prepend-icon": "mdi-fan", "size": "x-small", "variant": "outlined", "class": "ml-1",
-            }))
         if cpu_temp is not None:
             header.append(_node("VChip", f"CPU {_fmt(cpu_temp, 0)} °C", {
                 "prepend-icon": "mdi-thermometer", "size": "x-small", "variant": "outlined", "class": "ml-1",
+            }))
+        if fan_speed is not None:
+            header.append(_node("VChip", f"风扇 {_fmt(fan_speed, 0)} RPM", {
+                "prepend-icon": "mdi-fan", "size": "x-small", "variant": "outlined", "class": "ml-1",
             }))
         nodes.append(_node("div", props={"class": "d-flex align-center flex-wrap mb-2"}, content=header))
 
@@ -378,11 +378,11 @@ class UGreenNASMonitor(_PluginBase):
                     _node("VIcon", props={"icon": "mdi-memory", "color": "info", "size": "small"}),
                     _node("span", "内存占用", {"class": "text-caption"}),
                 ]),
-                _node("div", memory_value, {"class": "text-h6 font-weight-bold mt-2 text-no-wrap"}),
+                _node("div", memory_value, {"class": "text-h5 font-weight-bold mt-2 text-no-wrap", "style": "min-height: 36px; line-height: 36px; font-variant-numeric: tabular-nums;"}),
                 _node("VProgressLinear", props={
                     "model-value": min(100, max(0, mem)), "height": 5, "rounded": True, "color": "info", "class": "mt-2",
                 }),
-                _node("div", _fmt(mem) + "% 已使用", {"class": "text-caption text-medium-emphasis mt-1"}),
+                _node("div", _fmt(mem) + "% 已使用", {"class": "text-caption text-medium-emphasis mt-1", "style": "font-variant-numeric: tabular-nums;"}),
             ])
         ])
         nodes.append(_node("VRow", props={"dense": True}, content=[
