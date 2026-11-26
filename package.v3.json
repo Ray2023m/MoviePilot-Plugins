@@ -4,7 +4,7 @@
     "description": "在 MoviePilot V3 插件详情页查看绿联 UGOS Pro 的 CPU、内存、温度、风扇、硬盘、网络及存储卷状态。",
     "labels": "NAS,监控,绿联",
     "version": "1.0.0",
-    "icon": "ugreennasmonitor.png",
+    "icon": "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.png",
     "author": "Ray2023m",
     "level": 1,
     "system_version": ">=3.2.3,<4",
