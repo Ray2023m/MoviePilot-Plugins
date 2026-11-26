@@ -1,70 +1,53 @@
 # 绿联 NAS 监控（MoviePilot V3）
 
-直接通过绿联 UGOS Pro OpenCLI API 读取 NAS 监控数据，仅在 MoviePilot 插件详情页展示。
+< p align="center">
+  <img src="https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg" width="96" alt="绿联 NAS 监控图标">
+</p>
 
-## v1.5.0 布局调整
+通过绿联 UGOS Pro OpenCLI 只读接口获取 NAS 运行概览，在 MoviePilot 插件详情页展示状态。
 
-- CPU 温度显示在顶部风扇转速旁
-- 内存占用详情卡放到原 CPU 温度指标卡的位置
-- 网络流量及存储卷吞吐恢复为独立全宽区块，不再与磁盘组成左右双栏
-
-## v1.4.0 紧凑布局
-
-- 桌面端采用双栏排版，左侧磁盘、右侧网络与存储卷吞吐
-- 压缩指标卡片、内存条、磁盘表格和网络卡片的间距与高度
-- 目标是在常见桌面分辨率下减少纵向滚动；小屏设备仍采用自适应单栏
-
-## v1.2.0 界面优化
-
-- 顶部设备状态与磁盘健康概览
-- CPU、内存、GPU 指标增加可视化进度条
-- 磁盘健康状态使用颜色标签区分
-- 网卡收发速度改为独立流量卡片
-- 存储卷读写速度采用卡片式展示
-- 详情页继续沿用 MoviePilot 原生 Vuetify 主题，适配明暗主题
-
-## 功能
+## v1.0.0 首发功能
 
 - CPU、GPU、内存使用率
-- CPU 温度、风扇转速
+- CPU 温度与风扇转速
 - HDD / SSD 健康状态、温度、容量、使用率、读写速度
-- LAN 网卡收发速度
-- 存储卷读写速度
-- 仅保留插件详情页展示，不注册首页仪表板组件
-- 最近一次成功数据缓存；NAS 暂时不可用时保留最后一次成功结果
-- 只读访问，不执行 NAS 写入操作
+- 网卡实时接收与发送速度
+- 存储卷读写吞吐
+- 指标卡片、磁盘状态标签及响应式布局
+- NAS 数据本地缓存；短暂连接失败时保留最近一次成功数据
+- 仅调用只读监控接口，不执行 NAS 写入操作
 
-## 前置条件
+## 环境要求
 
+- MoviePilot V3（系统版本 3.2.3 或更高，且低于 4）
 - 绿联 UGOS Pro，已启用 OpenCLI 访问令牌
-- 令牌至少具有「任务管理」的只读权限（taskmgr_get_run_overview）
+- Token 至少具有「任务管理」读取权限（`taskmgr_get_run_overview`）
 - MoviePilot 容器能够访问 NAS 的 HTTPS 管理端口（默认 9443）
 
 ## 安装与配置
 
-1. 在 MoviePilot 设置中将 `PLUGIN_MARKET` 增加：
+1. 在 MoviePilot 插件市场添加仓库：
+
    `https://github.com/Ray2023m/MoviePilot-Plugins`
 2. 刷新插件市场并安装「绿联 NAS 监控」。
-3. 在插件设置中启用插件。
-4. NAS 地址填写例如 `https://10.10.10.10:9443`。
-5. 填写绿联后台生成的访问令牌（`ugpoa_v1.` 开头）。
-6. NAS 使用自签 HTTPS 证书时，关闭「验证 HTTPS 证书」；若使用受信任证书则建议开启。
-7. 保存后打开插件详情页。如需首页展示，在仪表板编辑中手动添加「绿联 NAS 状态」。
+3. 在插件设置中启用监控。
+4. NAS 地址填写根地址，例如 `https://10.10.10.10:9443`，不要附加 API 路径。
+5. 填写绿联 NAS 后台生成的 API Token（通常以 `ugpoa_v1.` 开头）。
+6. NAS 使用自签名证书时关闭「验证 HTTPS 证书」；使用可信证书时建议开启。
+7. 保存设置后进入插件详情页查看监控数据。
 
-## 安全
+## 安全说明
 
-- 令牌只保存在 MoviePilot 本机插件配置中，不写入 Git 仓库。
-- 建议使用只读、最小权限令牌；本插件只调用 Task Manager 的 `GetRunOverview`。
-- 不要把访问令牌提交到 GitHub、日志或公开聊天。
-- 建议不要将 NAS 的 OpenCLI 端口直接暴露到公网。
+- Token 仅保存在 MoviePilot 本机插件配置中，不会写入仓库。
+- 建议使用仅含任务管理读取权限的最小权限 Token。
+- 不要将 Token 提交到 GitHub、日志或公开聊天中。
+- 不建议将 NAS 的 OpenCLI 管理端口直接暴露到公网。
 
-## 接口与兼容性
+## 接口说明
 
-- HTTP：`POST /ugreen/opencli/v1/ugreen.taskmgr.internal.grpc/taskserv.TaskManage/GetRunOverview`
-- 认证：`Authorization: Bearer <access-token>`
+- 请求方式：`POST`
+- 接口路径：`/ugreen/opencli/v1/ugreen.taskmgr.internal.grpc/taskserv.TaskManage/GetRunOverview`
+- 认证方式：`Authorization: Bearer <access-token>`
 - 请求体：Protobuf Empty（空消息）
-- 响应：Protobuf RunOverview，由插件内置的轻量解码器解析。
-- 默认缓存 15 秒，配置范围 5–300 秒。
-- NAS 固件升级后如字段协议变化，可能需要更新插件解码器。
-
-仪表板组件需要用户手动添加，不会擅自修改已有仪表板布局。
+- 响应：Protobuf RunOverview，由插件内置轻量解码器解析
+- 默认缓存：15 秒，可在 5–300 秒范围内调整
