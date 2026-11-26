@@ -27,3 +27,8 @@ https://github.com/Ray2023m/MoviePilot-Plugins
 ## 版本
 
 当前仓库首发基线：**v1.0.0**。
+
+## 致谢
+
+本项目的插件框架、开发文档与图标资源均来自官方 [MoviePilot-Plugins](https://github.com/jxxghp/MoviePilot-Plugins)。感谢 MoviePilot 项目及其维护者提供的插件生态与开发支持。
+
