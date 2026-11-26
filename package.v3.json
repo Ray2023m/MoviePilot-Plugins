@@ -3,7 +3,7 @@
     "name": "绿联 NAS 监控",
     "description": "在 MoviePilot 插件详情页和仪表板查看绿联 UGOS Pro 的 CPU、内存、温度、硬盘、网络及存储卷状态。",
     "labels": "NAS,监控,绿联,仪表板",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "icon": "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg",
     "author": "Ray2023m",
     "level": 1,
@@ -11,7 +11,8 @@
     "history": {
       "v1.0.0": "首版：支持绿联 UGOS Pro JSON 转换接口，展示 CPU、内存、温度、风扇、磁盘、网络和卷读写状态；提供插件详情页及可选仪表板组件。",
       "v1.1.0": "改为插件直接调用绿联 NAS OpenCLI GetRunOverview，移除 JSON Bridge 和独立 API_KEY；插件内置只读 Protobuf 解码。",
-      "v1.2.0": "优化详情页视觉：状态概览、指标进度条、磁盘健康标签、网卡流量卡片及存储卷吞吐卡片；保持 OpenCLI 请求和 Protobuf 解码逻辑不变。"
+      "v1.2.0": "优化详情页视觉：状态概览、指标进度条、磁盘健康标签、网卡流量卡片及存储卷吞吐卡片；保持 OpenCLI 请求和 Protobuf 解码逻辑不变。",
+      "v1.3.0": "按需取消首页仪表板展示，仅保留插件详情页监控。"
     },
     "plugin_readme": "https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/plugins.v3/ugreennasmonitor/README.md",
     "release": true
