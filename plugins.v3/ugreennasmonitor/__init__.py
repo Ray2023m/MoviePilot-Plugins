@@ -387,6 +387,7 @@ class UGreenNASMonitor(_PluginBase):
         ])
         nodes.append(_node("VRow", props={"dense": True}, content=[
             _metric("CPU 使用率", _fmt(cpu) + "%", "mdi-cpu-64-bit", "primary", cpu),
+            _metric("内存使用率", _fmt(mem) + "%", "mdi-memory", "info", mem),
             memory_card,
             _metric("GPU 使用率", _fmt(gpu) + "%", "mdi-expansion-card", "success", gpu),
         ]))
