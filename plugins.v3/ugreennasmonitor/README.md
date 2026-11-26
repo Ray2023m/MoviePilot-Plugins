@@ -1,6 +1,6 @@
 # 绿联 NAS 监控（MoviePilot V3）
 
-< p align="center">
+<p align="center">
   <img src="https://raw.githubusercontent.com/Ray2023m/MoviePilot-Plugins/main/icons/ugreennasmonitor.svg" width="96" alt="绿联 NAS 监控图标">
 </p>
 
